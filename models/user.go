@@ -2,12 +2,12 @@ package models
 
 import (
 	"gorm.io/gorm"
+	"time"
 )
 
 var PublishMatches = false
 
 type (
-	// User represents the structure of our resource
 	User struct {
 		gorm.Model
 		Id      string `json:"_id" bson:"_id" gorm:"unique"`
@@ -24,6 +24,7 @@ type (
 		Matches string `json:"matches" bson:"matches"`
 		Dirty   bool   `json:"dirty" bson:"dirty"`
 		Publish bool   `json:"publish" bson:"publish"`
+		Timestamp time.Time `json:"timestamp" bson:"timestamp"`
 	}
 )
 type UserPublicKey struct {

@@ -4,7 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-
+	"time"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/pclubiitk/puppylove2.0_backend/mail"
 	"github.com/pclubiitk/puppylove2.0_backend/models"
@@ -38,18 +39,61 @@ func FetchReturnHearts(c *gin.Context) {
 }
 
 func FetchHearts(c *gin.Context) {
-	var heart models.SendHeart
-	var hearts []models.FetchHeartsFirst
-	// Fetch only required columns from the database
-	fetchheart := Db.Model(&heart).Select("enc", "gender_of_sender").Find(&hearts)
-
-	if fetchheart.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No hearts to fetch."})
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID not found in context"})
 		return
 	}
+	// fmt.Println("User ID:", userID)
+	type Time struct {
+		Timestamp string `json:"timestamp"`
+	}
+	var userTimestamp Time
 
+	if err := Db.Model(&models.User{}).
+		Select("timestamp").
+		Where("id = ?", userID).
+		Scan(&userTimestamp).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user timestamp"})
+		}
+		return
+	}
+	layout := "2006-01-02T15:04:05.999999999Z07:00" // RFC 3339 format
+	timestamp, err := time.Parse(layout, userTimestamp.Timestamp)
+	if err != nil {
+		// fmt.Println(timestamp)
+		fmt.Println("Failed to parse timestamp:", userTimestamp.Timestamp)
+		fmt.Println("Error:", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid timestamp format"})
+		return
+	}
+	var heart models.SendHeart
+	var hearts []models.FetchHeartsFirst
+
+	if err := Db.Model(&heart).
+		Select("enc, gender_of_sender").
+		Where("created_at > ?", timestamp).
+		Find(&hearts).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hearts"})
+		return
+	}
+	fmt.Println("Fetched Hearts:")
+	for i, h := range hearts {
+	    fmt.Printf("Heart %d: enc=%s, gender_of_sender=%s\n", i+1, h.Enc, h.GenderOfSender)
+	}
+	newTimestamp := time.Now().UTC().Add(-1*time.Minute).Format(time.RFC3339)
+	if err := Db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("timestamp", newTimestamp).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user timestamp"})
+		return
+	}
 	c.JSON(http.StatusOK, hearts)
 }
+
 func SentHeartDecoded(c *gin.Context) {
 	info := new(models.SentHeartsDecoded)
 	if err := c.BindJSON(info); err != nil {
