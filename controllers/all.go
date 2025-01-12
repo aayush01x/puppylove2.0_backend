@@ -80,10 +80,10 @@ func FetchHearts(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hearts"})
 		return
 	}
-	fmt.Println("Fetched Hearts:")
-	for i, h := range hearts {
-	    fmt.Printf("Heart %d: enc=%s, gender_of_sender=%s\n", i+1, h.Enc, h.GenderOfSender)
-	}
+	// fmt.Println("Fetched Hearts:")
+	// for i, h := range hearts {
+	//     fmt.Printf("Heart %d: enc=%s, gender_of_sender=%s\n", i+1, h.Enc, h.GenderOfSender)
+	// }
 	newTimestamp := time.Now().UTC().Add(-1*time.Minute).Format(time.RFC3339)
 	if err := Db.Model(&models.User{}).
 		Where("id = ?", userID).
